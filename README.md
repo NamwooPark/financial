@@ -1,2 +1,5 @@
-# financial
-financial data analysis in R
+# Financial Data Analysis
+
+financial data analysis practice in R
+
+* 
