@@ -1,0 +1,453 @@
+---
+title: "Financial Data Analysis"
+author: "Namwoo Park"
+date: "10/14/2018"
+output: html_document
+---
+
+
+```{r library, message=FALSE, warning=FALSE}
+library(quantmod)
+library(PerformanceAnalytics)
+library(ggplot2)
+```
+
+### 1. Load the stock data of Apple from “2011-12-31” to “2017-12-31”. Make sure it is in xts format. – 2.5 Marks
+```{r, message=FALSE, warning=FALSE}
+data.aapl <- getSymbols("AAPL", from = "2011-12-31", to = "2017-12-31", 
+                        auto.assign =  FALSE)
+class(data.aapl)
+```
+
+
+### 2. Subset the data of 2013. Show its head and tail. – 2.5 Marks
+```{r}
+sub.aapl <- subset(data.aapl, index(data.aapl) >= "2013-01-01" & index(data.aapl) <= "2013-12-31")
+head(sub.aapl)
+tail(sub.aapl)
+```
+
+
+### 3. Compute Simple Moving Average Crossover, Bollinger Band, Relative Strength Index using data frame from question 1. Explain these concepts in 2-4 sentences along with R codes and plot. – 6 Marks
+**Comment: For question 3, I subset the data with the term (from 2012-0101 to 2013-01-01) to show chart for year 2013 and to give more detailed information.**
+
+##### 3-1. Moving Average
+```{r}
+# I subset the data again with longer term to show one year moving average 
+aapl.sma <- data.aapl[,"AAPL.Close"]
+aapl.sma <- subset(aapl.sma, index(aapl.sma) >= "2012-01-01" & index(aapl.sma) <= "2013-12-31")
+aapl.sma$sma50 <- rollmeanr(aapl.sma$AAPL.Close, k=50)
+aapl.sma$sma200 <- rollmeanr(aapl.sma$AAPL.Close, k=200)
+aapl.sma <- subset(aapl.sma, index(aapl.sma) >= "2013-01-01" & index(aapl.sma) <= "2013-12-31")
+#Plot
+y.range<-range(aapl.sma,na.rm=TRUE)
+plot(x=index(aapl.sma), xlab="Date", y=aapl.sma$AAPL.Close, ylim=y.range,
+ylab="Price ($)", type="l", main="Apple - Simple Moving Average
+January 1, 2013 - December 31, 2013")
+lines(x=index(aapl.sma),y=aapl.sma$sma50, lty=2)
+lines(x=index(aapl.sma),y=aapl.sma$sma200,lty=3)
+legend("topleft", c("Apple Price","50-Day Moving Average","200-Day Moving Average"),
+lty=c(1,2,3))
+
+
+```
+
+* We can observe and compare the 50-Day Moving average and 200-Day Moving averaage to make decision. As you can see in the chart, 50-Day Moving Average cross over 200-Day Moving Average between September and October. 
+* This is called bullish crossover and when this happens, it can be taken as an indicator to buy the stock. 
+
+
+##### 3-2. Bollinger Band
+```{r}
+aapl.bb <- data.aapl[,"AAPL.Close"]
+aapl.bb$avg<-rollmeanr(aapl.bb$AAPL.Close,k=20)
+aapl.bb$sd<-rollapply(aapl.bb$AAPL.Close,width=20,FUN=sd,fill=NA)
+aapl.bb2013<-subset(aapl.bb,index(aapl.sma) >= "2013-01-01" & index(aapl.sma) <= "2013-12-31")
+aapl.bb2013$sd2up<-aapl.bb2013$avg+2*aapl.bb2013$sd
+aapl.bb2013$sd2down<-aapl.bb2013$avg-2*aapl.bb2013$sd
+#Plot
+y.range<-range(aapl.bb2013[,-3],na.rm=TRUE)
+plot(x=index(aapl.bb2013), xlab="Date", y=aapl.bb2013$AAPL.Close, ylim=y.range, ylab=
+"Price ($)", type="l",
+lwd=3, main="Apple - Bollinger Bands (20 days, 2 deviations)
+January 1, 2013 - December 31, 2013")
+lines(x=index(aapl.bb2013),y=aapl.bb2013$avg,lty=2)
+lines(x=index(aapl.bb2013),y=aapl.bb2013$sd2up,col="gray40")
+lines(x=index(aapl.bb2013),y=aapl.bb2013$sd2down,col="gray40")
+legend("topleft", c("Apple Price","20-Day Moving Average","Upper Band","Lower Band")
+,
+lty=c(1,2,1,1), lwd=c(3,1,1,1), col=c("black","black","gray40","gray40"))
+```
+
+* As shown in the chart, most of Apple's closing prices in 2013 fell within the Bollinger Bands. For a trend follwer, when it was between May and June and it was around August, this may be taken as an indication that the stock is oversold. 
+* Also, when it was between March and April and it was between September and October, this may be regarded as an sign that the stock is overbought. 
+
+
+##### 3-3. RSI
+```{r}
+aapl.rsi <- data.aapl[,"AAPL.Close"]
+aapl.rsi$delta<-diff(aapl.rsi$AAPL.Close)
+aapl.rsi$up<-ifelse(aapl.rsi$delta>0,1,0)
+aapl.rsi$down<-ifelse(aapl.rsi$delta<0,1,0)
+aapl.rsi$up.val<-aapl.rsi$delta*aapl.rsi$up
+aapl.rsi$down.val<--aapl.rsi$delta*aapl.rsi$down
+aapl.rsi<-aapl.rsi[-1,]
+aapl.rsi[c(1:3,nrow(aapl.rsi)),]
+aapl.rsi$up.first.avg<-rollapply(aapl.rsi$up.val, width=14,FUN=mean,fill=NA,na.rm=TRUE)
+aapl.rsi$down.first.avg<-rollapply(aapl.rsi$down.val, width=14,FUN=mean,fill=NA,na.rm
+=TRUE)
+up.val <- as.numeric(aapl.rsi$up.val)
+down.val <- as.numeric(aapl.rsi$down.val)
+aapl.rsi$up.avg <- aapl.rsi$up.first.avg
+for (i in 15:nrow(aapl.rsi)){
+aapl.rsi$up.avg[i] <-((aapl.rsi$up.avg[i-1]*13+up.val[i])/14)
+}
+aapl.rsi$down.avg <- aapl.rsi$down.first.avg
+for (i in 15:nrow(aapl.rsi)){
+aapl.rsi$down.avg[i]<- ((aapl.rsi$down.avg[i-1]*13+down.val[i])/14)
+}
+aapl.rsi$RS<-aapl.rsi$up.avg/aapl.rsi$down.avg
+aapl.rsi$RSI<-100-(100/(1+aapl.rsi$RS))
+aapl.rsi2013<-subset(aapl.rsi[,ncol(aapl.rsi)],index(aapl.rsi)>="2013-01-01"&index(aapl.rsi)<="2013-12-31")
+aapl.rsi2013[c(1:3,nrow(aapl.rsi2013)),]
+title1<-"Apple - Relative Strength Index"
+title2<-"January 2013 - December 2013"
+plot(x=index(aapl.rsi2013), xlab="Date", y=aapl.rsi2013$RSI, ylab="RSI (14-Day Moving
+Average)",
+ylim=c(0,100), type="l", main=paste(title1,"\n",title2))
+abline(h=c(30,70),lty=2)
+
+```
+
+* Around February, March, May, and July, we can see that RSI was below 30, which can be a signal that the stock was oversold. 
+* Also between August and September, and around Novemebr and December, we can see that RSI was above 70, which can be a signal that the stock was overbought. 
+
+
+### 4. Explain Exponential Moving Average with a plot (use data frame from question 1). – 4 Marks
+```{r}
+EMA50 <- EMA(Cl(data.aapl),n=50)
+EMA200 <- EMA(Cl(data.aapl),n=200)
+myIndicators_1 <- cbind.xts(Cl(data.aapl),EMA50,EMA200)
+tail(myIndicators_1)
+y.range<-range(myIndicators_1,na.rm=TRUE)
+plot(x=index(myIndicators_1), xlab="Date", y=myIndicators_1$AAPL.Close, ylim=y.range, 
+     ylab="Price ($)", type="l", main="Apple - Exponential Moving Average 
+     December 31, 2011 - December 31, 2017")
+lines(x=index(myIndicators_1),y=myIndicators_1$EMA, lty=3, col=c("red"), lwd=2)
+lines(x=index(myIndicators_1),y=myIndicators_1$EMA.1,lty=2, col= c("green"), lwd=2)
+legend("topleft", c("Apple Price","50-Day Moving Average","200-Day Moving Average"),lty=c(1,3,2),col=c("black","red", "green"), cex=0.7)
+
+```
+
+* As you can see from the chart, 50-Day Exponential Moving Average cross over 200-Day Exponential Moving Average around September 2014 and September 2017. 
+* This bullish crossover can be a signal that you can purchase stocks. 
+
+
+
+
+### 5. Calculate Price, total and Logarithmic return using data frame from question 1. Plot Price return vs Total return. Explain the advantages of total return in 2-4 sentences. – 5 Marks
+```{r}
+# Price Return
+aapl.price.ret <- data.aapl[,"AAPL.Close"]
+aapl.price.ret$aapl.price.ret<-Delt(aapl.price.ret$AAPL.Close)
+aapl.price.ret <- aapl.price.ret[,2]
+aapl.price.ret[c(1:3,nrow(aapl.price.ret)),]
+
+# Total Return
+aapl.tot.ret <- data.aapl[,"AAPL.Adjusted"]
+aapl.tot.ret$aapl.tot.ret=Delt(aapl.tot.ret$AAPL.Adjusted)
+aapl.tot.ret <- aapl.tot.ret[,2]
+aapl.tot.ret[c(1:3,nrow(aapl.tot.ret)),]
+
+# Logarithmic return
+aapl.log.ret <- data.aapl[,"AAPL.Adjusted"]
+aapl.log.ret$aapl.log.ret <- diff(log(aapl.log.ret$AAPL.Adjusted))
+aapl.log.ret<-aapl.log.ret[,2]
+aapl.log.ret[c(1:3,nrow(aapl.log.ret)),]
+
+# Cumulative Logarithmic return 
+aapl.logcum <- aapl.log.ret
+aapl.logcum[1,1]<-0
+logcumret=sum(aapl.logcum$aapl.log.ret)
+cumret=exp(logcumret)-1
+cumret
+
+# Comparing Price return and Total return
+aapl.Ret<-cbind(aapl.price.ret,aapl.tot.ret)
+names(aapl.Ret)<-c("prc.ret","tot.ret")
+aapl.Ret$prc.ret[1]<-0
+aapl.Ret$tot.ret[1]<-0
+aapl.Ret$gross.prc<-1+aapl.Ret$prc.ret
+aapl.Ret$gross.tot<-1+aapl.Ret$tot.ret
+aapl.Ret$cum.prc<-cumprod(aapl.Ret$gross.prc)
+aapl.Ret$cum.tot<-cumprod(aapl.Ret$gross.tot)
+aapl.Ret[nrow(aapl.Ret),c(5,6)] # Cumulative Price & Total return
+
+ggplot(aapl.Ret) + geom_line(aes(x=index(aapl.Ret), y=cum.tot), col='red') + geom_line(aes(x=index(aapl.Ret), y=cum.prc), col='blue') + labs(x="Year", y="Cumulative Return", title="APPLE's Total Returns and Price Returns, 2012 - 2018")
+
+```
+
+* Cumulative Price Return: 2.880651
+* Cumulative Total Return: 3.213458
+* Cumulative Logarithmic Return: 2.213458
+* Advantage of total return: total return enable us to properly make inferences from the data because it considers the adjustments to the closing price. The closing price of a stock is affected by stock splits or reverse stock splits and there are no adjustments to the closing price that reflects this. So, total return can complement this. 
+
+
+### 6. Compare the return: - 5 Marks
+##### 6-1. Jan-2014 vs Jan-2015
+```{r}
+mo <-data.aapl
+aapl.monthly <- to.monthly(mo)
+aapl.monthly <- aapl.monthly[,6]
+aapl.monthly$ret <- Delt(aapl.monthly$mo.Adjusted)
+aapl.monthly$ret[index(aapl.monthly) == "Jan 2014"]
+aapl.monthly$ret[index(aapl.monthly) == "Jan 2015"]
+```
+
+* Montly return of Jan-2014: -0.1076968
+* Montly return of Jan-2015:  0.06142434
+
+
+##### 6-2. Q2-2014 vs Q2-2015
+```{r}
+qu <- data.aapl
+aapl.quarterly <- to.quarterly(qu)
+aapl.quarterly <- aapl.quarterly[,6]
+aapl.quarterly$ret <- Delt(aapl.quarterly$qu.Adjusted)
+aapl.quarterly$ret[index(aapl.quarterly)=="2014 Q2"]
+aapl.quarterly$ret[index(aapl.quarterly)=="2015 Q2"]
+```
+
+* Quarterly return of Q2-2014: 0.2187342
+* Quarterly return of Q2-2015: 0.01224742
+
+
+### 7. Suppose you invested $100,000 in five stocks. Apple, Microsoft, Google, AT&T, Amazon ([.15, .25, .15, .25, 20]). Calculate the portfolio return from Jan-2011 to Dec-2017. Compare individual stock return with portfolio return using a plot. – 5 Marks
+
+```{r}
+data.aapl <- getSymbols("AAPL",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.msft <- getSymbols("MSFT",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.googl <- getSymbols("GOOGL",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.att <- getSymbols("T",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.amzn <- getSymbols("AMZN",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+return.aapl <- Return.calculate(data.aapl$AAPL.Adjusted)
+return.msft <- Return.calculate(data.msft$MSFT.Adjusted)
+return.googl <- Return.calculate(data.googl$GOOGL.Adjusted)
+return.att <- Return.calculate(data.att$T.Adjusted)
+return.amzn <- Return.calculate(data.amzn$AMZN.Adjusted)
+
+multi <-cbind(return.aapl, return.msft, return.googl, return.att,return.amzn)
+multi <- multi[-1,]
+return.port <- Return.portfolio(multi, weights = c(.15, .25, .15, .25, .20))
+cum.port <- Return.cumulative(return.port)
+cum.aapl <- Return.cumulative(return.aapl) 
+cum.msft <- Return.cumulative(return.msft) 
+cum.googl <- Return.cumulative(return.googl) 
+cum.att <- Return.cumulative(return.att) 
+cum.amzn <- Return.cumulative(return.amzn) 
+
+cum.multi <- cbind(cum.port, cum.aapl, cum.msft, cum.googl, cum.att, cum.amzn)
+cum.multi # cumulative return
+cum.multi * 100000
+
+multi.w.port <- cbind(multi,return.port)
+charts.PerformanceSummary(multi.w.port, geometric=TRUE, main="Cumulative Return (Portfolio vs 5 Stocks)")
+```
+
+* Amazon cumulative return is the higest at 5.34.
+* AT&T cumulative return is the lowest at 0.89. 
+* Portfolio return is 2.78.
+* If we invested $100,000 in the beginning, it would become $278,783 with portfolio return, $300,968 with Apple return, $268,562 with Microsoft return, $248,257 with Google return, $89,179 with AT&T return, and $534822 with Amazon return. 
+* Even if portfolio return is not the highest, if we consider risk adjusted return, it would be the best investment. 
+
+### 8. Calculate two benchmark portfolio – a) Equal- weighted and b) Value-Weighted and calculate their return with yearly rebalancing. Compare your portfolio return with both the benchmarks return using a plot. Explain your result in 2-4 sentences. – 10 Marks
+
+```{r}
+# equal weighted
+ew.port <- Return.portfolio(multi,  weights = c(.2, .2, .2, .2, .2), rebalance_on="years")
+# value weighted 
+vwport <- cbind(data.aapl[,4],data.msft[,4],data.googl[,4],data.att[,4], data.amzn[,4], return.aapl,return.msft,return.googl,return.att,return.amzn )
+vwport <- vwport[-1,]
+colnames(vwport)[6:10] <- c("AAPL.ret","MSFT.ret","GOOGL.ret","T.ret","AMZN.ret")
+
+price.yr <- vwport[,1:5]
+price.yrs <- subset(price.yr, index(price.yr)=="2011-01-04" | index(price.yr)=="2012-01-04" | index(price.yr)=="2013-01-04" | index(price.yr)=="2014-01-03" | index(price.yr)=="2015-01-02" | index(price.yr)=="2016-01-04" | index(price.yr)=="2017-01-04")
+
+price.yrs$aapl.shout<-c(6523000000,6591000000,6631000000,6310000000,5882000000 ,5594000000,5328000000)
+price.yrs$msft.shout<-c( 8570000000, 8465000000, 8444000000, 8395000000, 8297000000, 8051000000,7830000000)
+price.yrs$googl.shout<-c( 647000000, 654000000, 665000000, 737000000, 742000000, 745000000,748000000)
+price.yrs$att.shout<-c(  5938000000 ,5950000000 ,5821000000 ,5385000000 ,5221000000 ,5646000000 ,6189000000)
+price.yrs$amz.shout<-c( 456000000, 461000000, 453000000, 465000000, 462000000, 477000000,484000000)
+
+weights <- price.yrs
+weights$aapl.cap <- weights$AAPL.Close*weights$aapl.shout
+weights$msft.cap <- weights$MSFT.Close*weights$msft.shout
+weights$googl.cap <- weights$GOOGL.Close*weights$googl.shout
+weights$att.cap <- weights$T.Close*weights$att.shout
+weights$amzn.cap <- weights$AMZN.Close*weights$amz.shout
+weights$tot.mcap <- rowSums(weights[,11:15])
+
+weights$aapl.wgt <- weights$aapl.cap/weights$tot.mcap
+weights$msft.wgt <- weights$msft.cap/weights$tot.mcap
+weights$googl.wgt <- weights$googl.cap/weights$tot.mcap
+weights$att.wgt <- weights$att.cap/weights$tot.mcap
+weights$amzn.wgt <- weights$amzn.cap/weights$tot.mcap
+weights <- weights[,17:21]
+print("weights")
+weights
+vw.port <- Return.portfolio(multi,  weights = weights)
+portfolio <- cbind(ew.port[-1,], vw.port)
+names(portfolio) <- c("EqualWeight", "ValueWeight")
+portfolio[1,] <- c(0,0)
+portfolio$ew.gross <- portfolio$EqualWeight + 1
+portfolio$vw.gross <- portfolio$ValueWeight + 1
+portfolio$ew.cum <- cumprod(portfolio$ew.gross)
+portfolio$vw.cum <- cumprod(portfolio$vw.gross)
+
+# cumulative returns
+ew.Cumulative <-  Return.cumulative(ew.port)
+vw.Cumulative <- Return.cumulative(vw.port)
+print(paste("Equal Weighted Portfolio: ", ew.Cumulative))
+print(paste("Value Weighted Portfolio: ", vw.Cumulative))
+# chart
+ggplot(portfolio) + geom_line(aes(x=index(portfolio), y=ew.cum, col="Equal Weighted")) + geom_line(aes(x=index(portfolio), y=vw.cum, col="Value Weighted")) + labs(x="Year", y="Value of Investment", title="1 investment in Equal Weighted and Value Weighted Portolio of 5 stocks") + theme(legend.title = element_blank(), legend.position = "bottom")
+
+
+```
+
+* Figure above shows the performance of an investment in an EW and VW portfolio of APPLE, Microsoft, GOOGLE, AT&T, and AMAZON from January 01, 2011 to December 31, 2017. 
+* The cumulative equal weighted portfolio return is 3.0291
+* The cumulative value weighted portfolio return is 2.6819
+* The biggest reason why EW could have higher portfolio cumulative return is that EW invested 20% of fund on Amazon which has the highest cumulative return of 5.34 (see answer to question 7), but VW invested around only 8% to 15% on Amazon, which reduce the positive effect on portfolio.  
+
+
+
+### 9. Create a portfolio of Oracle, AT&T, Google, Texas Instruments, Intuitive Surgical and Visa over the time period - Jan-2011 to Dec-2017, equally-weighted and rebalanced monthly.
+##### 9-a. Calculate Portfolio return. (Both Daily and Cumulative) - 2.5 Marks
+
+```{r}
+data.orcl <- getSymbols("ORCL",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.att <- getSymbols("T",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.googl <- getSymbols("GOOGL",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.txn <- getSymbols("TXN",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.isrg <- getSymbols("ISRG",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+data.visa <- getSymbols("V",from="2011-01-01",to="2017-12-31",auto.assign=FALSE)
+
+return.orcl <- Return.calculate(data.orcl$ORCL.Adjusted)
+return.att <- Return.calculate(data.att$T.Adjusted)
+return.googl <- Return.calculate(data.googl$GOOGL.Adjusted)
+return.txn <- Return.calculate(data.txn$TXN.Adjusted)
+return.isrg <- Return.calculate(data.isrg$ISRG.Adjusted)
+return.visa <- Return.calculate(data.visa$V.Adjusted)
+
+multi <-cbind(return.orcl, return.att, return.googl, return.txn,return.isrg ,return.visa)
+multi <- multi[-1,]
+return.port <- Return.portfolio(multi, weights = rep(1/6, 6), rebalance_on = "months")
+#daily return
+return.port[c(1:3, nrow(return.port)),]
+#cumulative return
+return.port$gross <- return.port$portfolio.returns+1
+return.port$cum <- cumprod(return.port$gross)
+return.port[c(1:3, nrow(return.port)),3]
+
+
+```
+
+##### 9-b. Calculate Risks Sharpe ratio associate with your portfolio - 2.5 Marks
+
+```{r}
+orcl.mo <- to.monthly(data.orcl)
+att.mo <- to.monthly(data.att)
+googl.mo <- to.monthly(data.googl)
+txn.mo <- to.monthly(data.txn)
+isrg.mo <- to.monthly(data.isrg)
+visa.mo <- to.monthly(data.visa)
+
+orcl.mo.ret <- Return.calculate(orcl.mo[,6])
+att.mo.ret  <- Return.calculate(att.mo[,6])
+googl.mo.ret  <- Return.calculate(googl.mo[,6])
+txn.mo.ret  <- Return.calculate(txn.mo[,6])
+isrg.mo.ret  <-  Return.calculate(isrg.mo[,6])
+visa.mo.ret  <-  Return.calculate(visa.mo[,6])
+
+multi.mo <-cbind(orcl.mo.ret, att.mo.ret, googl.mo.ret, txn.mo.ret,isrg.mo.ret ,visa.mo.ret)
+multi.mo <- multi.mo[-1,]
+return.port.mo <- Return.portfolio(multi.mo, weights = rep(1/6, 6), rebalance_on = "months")
+
+Rf = .0007
+# minimum acceptable return
+mar<-0.015
+annual.port.ret<-mean(return.port.mo$portfolio.returns)*12
+annual.port.ret
+annual.port.sd<-sd(return.port.mo$portfolio.returns)*sqrt(12)
+annual.port.sd
+Sharpe.port<-(annual.port.ret - Rf)/annual.port.sd
+print(paste("Sharpe Ratio: ", Sharpe.port))
+
+```
+
+* Sharpe Ratio: 1.6677
+
+
+##### 9-c. Calculate historical VaR - 2.5 Marks
+```{r}
+return.orcl <- Return.calculate(data.orcl$ORCL.Adjusted)
+return.att <- Return.calculate(data.att$T.Adjusted)
+return.googl <- Return.calculate(data.googl$GOOGL.Adjusted)
+return.txn <- Return.calculate(data.txn$TXN.Adjusted)
+return.isrg <- Return.calculate(data.isrg$ISRG.Adjusted)
+return.visa <- Return.calculate(data.visa$V.Adjusted)
+
+multi <-cbind(return.orcl, return.att, return.googl, return.txn,return.isrg ,return.visa)
+multi <- multi[-1,]
+
+ret.cum.orcl <- Return.cumulative(return.orcl)
+ret.cum.att <- Return.cumulative(return.att)
+ret.cum.googl <- Return.cumulative(return.googl)
+ret.cum.txn <- Return.cumulative(return.txn)
+ret.cum.isrg <- Return.cumulative(return.isrg)
+ret.cum.visa <- Return.cumulative(return.visa)
+equal.amt <- 1000000*1/6
+
+orcl.val <- as.numeric(equal.amt*(1+ret.cum.orcl))
+att.val <- as.numeric(equal.amt*(1+ret.cum.att))
+googl.val <- as.numeric(equal.amt*(1+ret.cum.googl))
+txn.val <- as.numeric(equal.amt*(1+ret.cum.txn))
+isrg.val <- as.numeric(equal.amt*(1+ret.cum.isrg))
+visa.val <- as.numeric(equal.amt*(1+ret.cum.visa))
+
+tot.val <- sum(orcl.val,att.val,googl.val,txn.val,isrg.val,visa.val)
+tot.val
+sim.portPnL <- orcl.val*multi$ORCL.Adjusted + att.val*multi$T.Adjusted + googl.val*multi$GOOGL.Adjusted + txn.val*multi$TXN.Adjusted + isrg.val*multi$ISRG.Adjusted + visa.val*multi$V.Adjusted
+
+names(sim.portPnL) <- "Port.PnL"
+head(sim.portPnL)
+
+#Historical VaR at 1% and 5%
+VaR01.Historical=quantile(-sim.portPnL$Port.PnL,0.99)
+VaR01.Historical
+
+VaR05.Historical=quantile(-sim.portPnL$Port.PnL,0.95)
+VaR05.Historical
+```
+
+* If I invested $1,000,000 on this portfolio, I'm 95% confident that my daily loss will not exceed $63,680. 
+* If I invested $1,000,000 on this portfolio, I'm 99% confident that my daily loss will not exceed $100,287
+
+
+##### 9-d. Calculated historical Expected Shortfall - 2.5 Marks
+
+```{r}
+ES.PnL <-sim.portPnL$Port.PnL
+ES.PnL$dummy01<-ifelse(ES.PnL$Port.PnL< (- VaR01.Historical) ,1,0)
+ES.PnL$dummy05<-ifelse(ES.PnL$Port.PnL< (-VaR05.Historical) ,1,0)
+head(ES.PnL)
+shortfall01<-subset(ES.PnL,ES.PnL$dummy01==1)
+shortfall05<-subset(ES.PnL,ES.PnL$dummy05==1)
+ES01.Historical<- -mean(shortfall01$Port.PnL)
+ES01.Historical
+ES05.Historical<- -mean(shortfall05$Port.PnL)
+ES05.Historical
+```
+
+* We have a 5% probability that the loss in our portfolio would exceed the VaR, but when it does, we expect that, on average, we woud lose $88,212.
+* We have a 1% probability that the loss in our portfolio would exceed the VaR, but when it does, we expect that, on average, we woud lose $127,688.
